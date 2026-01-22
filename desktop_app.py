@@ -151,6 +151,9 @@ class DroneApp(tk.Tk):
         self._add_input("Max Iterations:", "max_iter", 100)
         self._add_input("Threshold (%):", "thresh", 1.0)
         
+        self.stop_at_thresh_var = tk.BooleanVar(value=False)
+        ttk.Checkbutton(self.sidebar, text="Run Until Threshold Met", variable=self.stop_at_thresh_var).pack(anchor="w", pady=5)
+        
         tk.Label(self.sidebar, text="").pack(pady=5)
         
         # Run Button
@@ -229,6 +232,7 @@ class DroneApp(tk.Tk):
             speed = float(self.speed.get())
             max_iter = int(self.max_iter.get())
             thresh = float(self.thresh.get()) / 100.0
+            run_until_thresh = self.stop_at_thresh_var.get()
         except ValueError:
             messagebox.showerror("Input Error", "Please ensure all parameters are valid numbers.")
             return
@@ -240,11 +244,11 @@ class DroneApp(tk.Tk):
         self.progress_var.set(0)
         self.status_lbl.config(text="Initializing...")
         
-        t = threading.Thread(target=self.run_logic, args=(n_drones, n_targets, map_size, speed, max_iter, thresh))
+        t = threading.Thread(target=self.run_logic, args=(n_drones, n_targets, map_size, speed, max_iter, thresh, run_until_thresh))
         t.daemon = True
         t.start()
 
-    def run_logic(self, n_drones, n_targets, map_size, speed, max_iter, thresh):
+    def run_logic(self, n_drones, n_targets, map_size, speed, max_iter, thresh, run_until_thresh):
         try:
             self.sim = DroneSwarmSimulation(n_drones, n_targets, map_size, speed)
             sim = self.sim
@@ -258,10 +262,18 @@ class DroneApp(tk.Tk):
             # Step 2
             self.update_status("Optimizing...")
             converged = False
-            for i in range(max_iter):
+            converged = False
+            
+            # Determine loop limit
+            loop_limit = 1000000 if run_until_thresh else max_iter
+            
+            for i in range(loop_limit):
                 converged, dev = sim.step_optimize(thresh)
                 if i % 5 == 0 or converged:
-                    self.update_progress((i+1)/max_iter*100, f"Iter {i}: Deviation {dev:.1%}")
+                    progress_val = (i+1) / max_iter * 100 if not run_until_thresh else 0
+                    if run_until_thresh: progress_val = min((i % 100), 100) # Indeterminate spinner effect
+                    
+                    self.update_progress(progress_val, f"Iter {i}: Deviation {dev:.1%}")
                     self.update_plots(sim)
                 
                 if converged:
@@ -271,7 +283,8 @@ class DroneApp(tk.Tk):
                 
             self.update_plots(sim)
             if not converged:
-                 self.update_status("Finished max iterations.")
+                 msg = "Finished max iterations." if not run_until_thresh else "Stopped (Hit Safety Limit)."
+                 self.update_status(msg)
             
             # Enable Exports
             self.after(0, lambda: [self.btn_csv.state(['!disabled']), self.btn_img.state(['!disabled'])])
