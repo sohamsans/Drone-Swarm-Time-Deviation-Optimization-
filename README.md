@@ -55,6 +55,13 @@ This project implements a simulation for optimizing the flight paths of a drone 
 *   `run_app.bat`: Windows launcher script.
 
 ## 🧠 The Algorithm
+### Key Concepts
+*   **Time Deviation**: This is the gap between the fastest and slowest drone, calculated as:  
+    `Deviation = (Max_Time - Min_Time) / Max_Time`  
+    For example, if the slowest drone takes 100s and the fastest takes 80s, the deviation is `(100 - 80) / 100 = 20%`. This means the swarm is 20% unbalanced.
+*   **Threshold**: This is your target for perfection. If you set the threshold to **5%**, the algorithm will keep optimizing until the difference between the drones is less than 5%. Lower values mean better balance but might take longer to compute.
+
+### Optimization Steps
 1.  **Initialize**: Random targets + K-Means clustering.
 2.  **Route**: Solve TSP for each cluster.
 3.  **Optimize Loop**:
